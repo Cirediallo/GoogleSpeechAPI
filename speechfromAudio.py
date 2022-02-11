@@ -26,7 +26,7 @@ def transcribe_streaming(stream_file):
     config = speech.RecognitionConfig(
         encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
         sample_rate_hertz=8000,
-        language_code="fr-FR", #change en-US to fr-FR
+        language_code="en-US", #change en-US to fr-FR
     )
 
     streaming_config = speech.StreamingRecognitionConfig(config=config)
@@ -37,20 +37,67 @@ def transcribe_streaming(stream_file):
         requests=requests,
     )
 
+    #create a file where to put transctiption
+    fhand = open('local_audio_transcript.txt', 'w')
     for response in responses:
         # Once the transcription has settled, the first result will contain the
         # is_final result. The other results will be for subsequent portions of
         # the audio.
         for result in response.results:
-            print("Finished: {}".format(result.is_final))
-            print("Stability: {}".format(result.stability))
+            #print("Finished: {}".format(result.is_final))
+            #print("Stability: {}".format(result.stability))
             alternatives = result.alternatives
             # The alternatives are ordered from most likely to least.
             for alternative in alternatives:
-                print("Confidence: {}".format(alternative.confidence))
+                #print("Confidence: {}".format(alternative.confidence))
                 print(u"Transcript: {}".format(alternative.transcript))
+                
+                fhand.write("{}".format(alternative.transcript))
 
 
 
-stream_file = "C:\\Users\Mamadou\Documents\Cours\M1 ATAL\S2\TER\Google Speech API\OSR_fr_000_0041_8k.wav"
+
+
+
+stream_file = "C:\\Users\Mamadou\Documents\Cours\M1 ATAL\S2\TER\Google Speech API\OSR_us_000_0010_8k.wav"
 transcribe_streaming(stream_file)
+
+""" TRANSCRIPTION """
+
+# Imports the Google Cloud Translation library
+from google.cloud import translate
+
+# Initialize Translation client
+def translate_text(text, project_id="speechtotextapi-340414"):
+    """Translating Text."""
+
+    client = translate.TranslationServiceClient()
+
+    location = "global"
+
+    parent = f"projects/{project_id}/locations/{location}"
+
+    # Translate text from English to French
+    # Detail on supported types can be found here:
+    # https://cloud.google.com/translate/docs/supported-formats
+    response = client.translate_text(
+        request={
+            "parent": parent,
+            "contents": [text],
+            "mime_type": "text/plain",  # mime types: text/plain, text/html
+            "source_language_code": "en-US",
+            "target_language_code": "fr",
+        }
+    )
+
+    # Display the translation for each input text provided
+    for translation in response.translations:
+        print("Translated text: {}".format(translation.translated_text))
+
+
+fhand = open('local_audio_transcript.txt', 'r')
+# we read the whole file because it's a small file 
+# in case of big files modify the writing option first
+# then here the reading option
+text = fhand.read() 
+translate_text(text)
