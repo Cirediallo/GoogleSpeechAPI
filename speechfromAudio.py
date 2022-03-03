@@ -1,4 +1,7 @@
 import os
+import time
+import threading
+
 credential_path = "C:\\Users\Mamadou\Documents\Cours\M1 ATAL\S2\TER\Google Speech API\speechtotextapi-340414-1e2134d625a1.json"
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
 
@@ -53,6 +56,7 @@ def transcribe_streaming(stream_file):
                 print(u"Transcript: {}".format(alternative.transcript))
                 
                 fhand.write("{}".format(alternative.transcript))
+                
 
 
 
@@ -60,7 +64,7 @@ def transcribe_streaming(stream_file):
 
 
 stream_file = "C:\\Users\Mamadou\Documents\Cours\M1 ATAL\S2\TER\Google Speech API\OSR_us_000_0010_8k.wav"
-transcribe_streaming(stream_file)
+#transcribe_streaming(stream_file)
 
 """ TRANSCRIPTION """
 
@@ -93,6 +97,7 @@ def translate_text(text, project_id="speechtotextapi-340414"):
     # Display the translation for each input text provided
     for translation in response.translations:
         print("Translated text: {}".format(translation.translated_text))
+        time.sleep(0.5)
 
 
 fhand = open('local_audio_transcript.txt', 'r')
@@ -100,4 +105,7 @@ fhand = open('local_audio_transcript.txt', 'r')
 # in case of big files modify the writing option first
 # then here the reading option
 text = fhand.read() 
-translate_text(text)
+#translate_text(text)
+
+th_transciption = threading.Thread(transcribe_streaming(stream_file))
+th_translation = threading.Thread(translate_text(text))
