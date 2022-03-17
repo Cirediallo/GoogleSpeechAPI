@@ -16,8 +16,7 @@ from PIL import Image
 
 from random import randrange
 
-credential_path = "C:\\Users\Mamadou\Documents\Cours\M1 ATAL\S2\TER\Google Speech API\speechtotextapi-340414-1e2134d625a1.json"
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
+
 
 def streamFile(file):
     return os.path.abspath(file)
