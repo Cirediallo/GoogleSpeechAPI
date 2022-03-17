@@ -2,8 +2,8 @@ from concurrent.futures import thread
 import os
 import io
 from google.cloud import speech
-
 from google.cloud import translate
+from nltk.corpus import stopwords
 
 import time
 import threading
@@ -23,7 +23,8 @@ def streamFile(file):
     return os.path.abspath(file)
 
 
-audio_file = "OSR_us_000_0010_8k.wav"
+#audio_file = "OSR_us_000_0010_8k.wav"
+audio_file = "OSR_fr_000_0041_8k.wav"
 assembly = set()
 
 def transcribe_streaming(stream_file):
@@ -42,7 +43,7 @@ def transcribe_streaming(stream_file):
     config = speech.RecognitionConfig(
         encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
         sample_rate_hertz=8000,
-        language_code="en-US", #change en-US to fr-FR
+        language_code="fr-FR", #change en-US to fr-FR
     )
 
     streaming_config = speech.StreamingRecognitionConfig(config=config)
@@ -68,7 +69,7 @@ def transcribe_streaming(stream_file):
                 #assembly.add(alternative.transcript)
                 print(u"Transcript: {}".format(alternative.transcript))
                 #print(assembly)
-                time.sleep(0.2)
+                #time.sleep(0.2)
 
 
 
@@ -89,8 +90,8 @@ def translate_text(text, project_id="speechtotextapi-340414"):
             "parent": parent,
             "contents": [text],
             "mime_type": "text/plain",  # mime types: text/plain, text/html
-            "source_language_code": "en-US",
-            "target_language_code": "fr-FR",
+            "source_language_code": "fr-FR",
+            "target_language_code": "en-US",
         }
     )
 
@@ -100,15 +101,19 @@ def translate_text(text, project_id="speechtotextapi-340414"):
     for translation in response.translations:
         fhand.write("{}".format(translation.translated_text))
         print("Translated text: {}".format(translation.translated_text))
-    time.sleep(0.5)
+    #time.sleep(0.5)
 
 
-
+"""
 fhand = open("transcript_file.txt", "r")
 text = fhand.read()
-
+translate_text(text, project_id="speechtotextapi-340414")
+"""
+#transcribe_streaming(os.path.abspath(audio_file))
+#translate_text(text)
 #th1 = threading.Thread(target=hah)
 #th2 = threading.Thread(target=blabla)
+"""
 th1 = threading.Thread(target=lambda: translate_text(text))
 th2 = threading.Thread(target=lambda: transcribe_streaming(os.path.abspath(audio_file)))
 
@@ -117,7 +122,7 @@ th2.start()
 
 th1.join()
 th2.join()
-
+"""
 print("HERE MUST START THE WORDCLOUD")
 french_stop_words = [
                 'd\'','du','de', 'la', 'des', 
@@ -128,7 +133,7 @@ french_stop_words = [
                 'au', 'c', 'aussi', 'toutes', 'autre', 'comme', 'd\'un',
                 'nos', 'vos', 'leur', 'mon', 'ton', 'son', 'ma', 'ta', 'sa',
                 'mes', 'tes', 'ses', 'notre', 'votre','l\'huile', 'l\'eau',
-                'c\'est', '1', '2', '3','4','5','6','7','8','9','0'
+                'c\'est', '1', '2', '3','4','5','6','7','8','9','0', 'c', 'c\''
             ]
 english_stop_words = [
     'a','about','above','after','again','against','all','also','am','an',
@@ -159,14 +164,14 @@ english_stop_words = [
 def frequency(file, langage_stop_words):
     frequency = {}
     fhand = open(file, "r")
-    # if the file is a long blob
     """
+    # handle the file if it is a long blob
     for line in fhand:
         sp_line = line.split()
         sp_line = list(set(sp_line).difference(langage_stop_words))
         for word in sp_line:
             frequency[word] = frequency.get(word, 0) + 1
-    """ 
+    """
     text = fhand.read() # read the whole file
     sp_text = text.split()
     print(sp_text)
@@ -175,15 +180,16 @@ def frequency(file, langage_stop_words):
         frequency[word] = frequency.get(word, 0) + 1
     frequency_to_string = " ".join(sp_text)
     print("=======================")
-    print(frequency_to_string)
+    #print(frequency_to_string)
+    
     print(frequency)
     fhand = open(file, "w")
     fhand.write(frequency_to_string)
     return frequency
-
-file = os.path.abspath("transcript.txt")
-t = frequency(file, french_stop_words)
 """
+file = os.path.abspath("transcript.txt")
+t = frequency(file, english_stop_words)
+
 fhand = open("transcript.txt", "r")
 words = fhand.read()
 wordcloud = WordCloud(background_color = 'white', stopwords = french_stop_words).generate(words)
@@ -191,6 +197,12 @@ plt.imshow(wordcloud)
 plt.axis("off")
 plt.show()
 #transcribe_streaming(os.path.abspath(audio_file))
+"""
+
+"""
+===============================================
+===  DRAW THE WORDCLOUD OF THE TRANSLATION ====
+===============================================
 """
 def makeImage(text):
     wc = WordCloud(background_color="white")
@@ -200,14 +212,62 @@ def makeImage(text):
     plt.axis("off")
     plt.show()
 
-makeImage(t)
 
+#compute the word error rate between the original
+def wer(original, fromApi):
+    fhand_original = open(original, "r")
+    fhand_fromApi = open(fromApi, "r")
+    or_sp = fhand_original.read().split()
+    api_sp = fhand_fromApi.read().split()
+
+    difference = list(set(or_sp).difference(api_sp))
+    print("PRINTING THE DIFFERENCE")
+    print(len(difference)/len(or_sp))
+    plt.rcParams["figure.figsize"] = (11,8)
+    plt.plot(or_sp, color="green", label='Original')
+    
+    plt.plot(api_sp, color="blue", label='Transcripted')
+    #plt.plot(difference, color="black", label="Difference")
+    #plt.fill_between(or_sp, api_sp, color="red", alpha=0.3)
+    
+    plt.title("Match between Original and Transcripted transcriptions")
+    plt.xlabel("Transcription line number")
+    plt.ylabel("MER (lower is better)")
+    
+    plt.legend()
+    plt.show()
+
+
+"""
+===============================================
+================ MAIN FUNCTION ================
+===============================================
 """
 def main():
-    if __name__ == __main__:
-        transcribe_streaming()
-        translate_text()
-        frequency()
-        makeImage()
+    if __name__ == "__main__":
+        transcribe_streaming(os.path.abspath(audio_file))
+        fhand = open("transcript_file.txt", "r")
+        text = fhand.read()
+        print("Start of the translation")
+        translate_text(text)
 
-"""
+
+        
+        file = os.path.abspath("transcript.txt")
+        freq = frequency(file, english_stop_words)
+
+        fhand = open("transcript.txt", "r")
+        words = fhand.read()
+        wordcloud = WordCloud(background_color = 'white', stopwords = french_stop_words).generate(words)
+        plt.imshow(wordcloud)
+        plt.axis("off")
+        plt.show()
+
+        makeImage(freq)
+
+        print("COMPUTE THE WORD ERROR RATE")
+        fromApi = os.path.abspath("transcript_file.txt")
+        original = os.path.abspath("original.txt")
+        wer(original, fromApi)
+
+main()
