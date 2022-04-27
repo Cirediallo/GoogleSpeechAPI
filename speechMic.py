@@ -142,6 +142,7 @@ def main():
     # for a list of supported languages.
     #language_code = "en-US"  # a BCP-47 language tag
     language_code = "fr-FR"
+    #language_code = "ar-SA"
 
     client = speech.SpeechClient()
     config = speech.RecognitionConfig(

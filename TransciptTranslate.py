@@ -16,14 +16,16 @@ from PIL import Image
 
 from random import randrange
 
-
+credential_path = "C:\\Users\Mamadou\Documents\Cours\M1 ATAL\S2\TER\Google Speech API\speechtotextapi-340414-1e2134d625a1.json"
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
 
 def streamFile(file):
     return os.path.abspath(file)
 
 
-#audio_file = "OSR_us_000_0010_8k.wav"
-audio_file = "OSR_fr_000_0041_8k.wav"
+audio_file = "OSR_us_000_0010_8k.wav"
+#audio_file = "OSR_fr_000_0041_8k.wav"
+#audio_file = "OSR_cn_000_0072_8k.wav"
 assembly = set()
 
 def transcribe_streaming(stream_file):
@@ -42,7 +44,7 @@ def transcribe_streaming(stream_file):
     config = speech.RecognitionConfig(
         encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
         sample_rate_hertz=8000,
-        language_code="fr-FR", #change en-US to fr-FR
+        language_code="en-US", #change en-US to fr-FR
     )
 
     streaming_config = speech.StreamingRecognitionConfig(config=config)
@@ -89,8 +91,8 @@ def translate_text(text, project_id="speechtotextapi-340414"):
             "parent": parent,
             "contents": [text],
             "mime_type": "text/plain",  # mime types: text/plain, text/html
-            "source_language_code": "fr-FR",
-            "target_language_code": "en-US",
+            "source_language_code": "en-US",
+            "target_language_code": "es-ES",
         }
     )
 
@@ -245,6 +247,7 @@ def wer(original, fromApi):
 def main():
     if __name__ == "__main__":
         transcribe_streaming(os.path.abspath(audio_file))
+        
         fhand = open("transcript_file.txt", "r")
         text = fhand.read()
         print("Start of the translation")
@@ -263,10 +266,11 @@ def main():
         plt.show()
 
         makeImage(freq)
-
+        """
         print("COMPUTE THE WORD ERROR RATE")
         fromApi = os.path.abspath("transcript_file.txt")
         original = os.path.abspath("original.txt")
         wer(original, fromApi)
+        """
 
 main()
