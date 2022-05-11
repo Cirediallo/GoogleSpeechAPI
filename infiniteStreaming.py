@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+#chcp 1256
+
 """Google Cloud Speech API sample application using the streaming API.
 NOTE: This module requires the dependencies `pyaudio` and `termcolor`.
 To install using pip:
@@ -60,17 +63,23 @@ def get_current_time():
 
     return int(round(time.time() * 1000))
 
+# function added
+def duration_to_secs(duration):
+    return duration.seconds + (duration.nanos /float(1e9))
+
 
 class ResumableMicrophoneStream:
     """Opens a recording stream as a generator yielding the audio chunks."""
 
     def __init__(self, rate, chunk_size):
+        
         self._rate = rate
         self.chunk_size = chunk_size
         self._num_channels = 1
         self._buff = queue.Queue()
         self.closed = True
         self.start_time = get_current_time()
+        """
         self.restart_counter = 0
         self.audio_input = []
         self.last_audio_input = []
@@ -92,10 +101,32 @@ class ResumableMicrophoneStream:
             # overflow while the calling thread makes network requests, etc.
             stream_callback=self._fill_buffer,
         )
+        """
+        # add: 2 bytes in 16 bits samples
+        self._bytes_per_sample = 2 * self._num_channels
+        self._bytes_per_second = self._rate * self._bytes_per_sample
 
+        self._bytes_per_chunk = (self.chunk_size * self._bytes_per_sample)
+        self._chunks_per_second = (self._bytes_per_second // self._bytes_per_chunk)
+        # end add
+    
     def __enter__(self):
 
         self.closed = False
+        #add 
+        self._audio_interface = pyaudio.PyAudio()
+        self._audio_stream = self._audio_interface.open(
+            format=pyaudio.paInt16,
+            channels=self._num_channels,
+            rate=self._rate,
+            input=True,
+            frames_per_buffer=self.chunk_size,
+            # Run the audio stream asynchronously to fill the buffer object.
+            # This is necessary so that the input device's buffer doesn't
+            # overflow while the calling thread makes network requests, etc.
+            stream_callback=self._fill_buffer,
+        )
+        #end add
         return self
 
     def __exit__(self, type, value, traceback):
@@ -118,6 +149,7 @@ class ResumableMicrophoneStream:
         """Stream Audio from microphone to API and to local buffer"""
 
         while not self.closed:
+            """
             data = []
 
             if self.new_stream and self.last_audio_input:
@@ -145,7 +177,10 @@ class ResumableMicrophoneStream:
                         data.append(self.last_audio_input[i])
 
                 self.new_stream = False
-
+            """
+            if get_current_time() - self.start_time > STREAMING_LIMIT:
+                self.start_time = get_current_time()
+                break
             # Use a blocking get() to ensure there's at least one chunk of
             # data, and stop iteration if the chunk is None, indicating the
             # end of the audio stream.
@@ -153,12 +188,17 @@ class ResumableMicrophoneStream:
             #comment this section so the api won't auto stop when bad connexion or nothing is provided 
             
             chunk = self._buff.get()
+            """
             self.audio_input.append(chunk)
-
+            """
             if chunk is None:
                 return
             
+            """data.append(chunk)"""
+            #add
+            data = []
             data.append(chunk)
+
             # Now consume whatever other data's still buffered.
             while True:
                 try:
@@ -168,7 +208,7 @@ class ResumableMicrophoneStream:
                         return
                     
                     data.append(chunk)
-                    self.audio_input.append(chunk)
+                    #self.audio_input.append(chunk)
 
                 except queue.Empty:
                     break
@@ -176,7 +216,13 @@ class ResumableMicrophoneStream:
             yield b"".join(data)
 
 
-def listen_print_loop(responses, stream):
+#language = "ar-SA"
+#language = "pt-BR"
+language = "fr-FR"
+
+
+
+def listen_print_loop(responses, stream, language):
     """Iterates through server responses and prints them.
     The responses passed is a generator that will block until a response
     is provided by the server.
@@ -220,6 +266,7 @@ def listen_print_loop(responses, stream):
         
         transcript = result.alternatives[0].transcript
 
+        """
         result_seconds = 0
         result_micros = 0
 
@@ -236,6 +283,7 @@ def listen_print_loop(responses, stream):
             - stream.bridging_offset
             + (STREAMING_LIMIT * stream.restart_counter)
         )
+        """
         # Display interim results, but with a carriage return at the end of the
         # line, so subsequent lines will overwrite them.
 
@@ -243,34 +291,52 @@ def listen_print_loop(responses, stream):
 
             sys.stdout.write(GREEN)
             sys.stdout.write("\033[K")
-            sys.stdout.write(str(corrected_time) + ": " + transcript + "\n")
-            #sys.stdout.write(str(corrected_time) + ": " + sentence + "\n")
+            """sys.stdout.write(str(corrected_time) + " transcription: " + transcript + "\n")"""
+            sys.stdout.write("transcription" + sentence + "\n")
 
+            #added
+            #fhand = open("streaming.txt", "w+")
+            #for translation in response.translations:
+            #fhand.write("{}".format(transcript))
+            
+            if language != "ar-SA":
+                fhand = open("streaming.txt", "a+")
+                fhand.write("{}".format(transcript))
+            else:
+                fhand = open("streaming.txt", "wb+")
+                #fhand.write(transcript).decode("utf-8")
+                print(transcript.encode("utf-8"))
+                transcript = transcript.encode("utf-8")
+                fhand.write(transcript)
+            
+            #end added
+            """
             stream.is_final_end_time = stream.result_end_time
             stream.last_transcript_was_final = True
+            """
 
             # Exit recognition if any of the transcribed phrases could be
             # one of our keywords.
             #if re.search(r"\b(sortir|quit)\b", transcript, re.I):
-            if re.search(r"\b(sortir|quit)\b", transcript, re.I):
+
+            if re.search(r"\b(sortir de là|end of transcription|propaganda)\b", transcript, re.I):
                 sys.stdout.write(YELLOW)
                 sys.stdout.write("Exiting...\n")
                 stream.closed = True
                 break
 
+            
+
         else:
             sys.stdout.write(RED)
             sys.stdout.write("\033[K")
+            """
             #sys.stdout.write(str(corrected_time) + ": " + transcript + "\r")
-            sys.stdout.write(str(corrected_time) + ": " + "sentence" + "\r")
+            sys.stdout.write(str(corrected_time) + " sentence: " + "sentence" + "\r")
+            """
+            sys.stdout.write("transcript: " + transcript + "\r")
 
-            #added
-            fhand = open("streaming.txt", "a+")
-            #for translation in response.translations:
-            fhand.write("{}".format(transcript))
-            #end added
-
-            stream.last_transcript_was_final = False
+            """stream.last_transcript_was_final = False"""
 
 
 def main():
@@ -280,7 +346,10 @@ def main():
     config = speech.RecognitionConfig(
         encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
         sample_rate_hertz=SAMPLE_RATE,
-        language_code="en-US",
+        #language_code="ar-SA",
+        #language_code="es-ES",
+        language_code="fr-FR",
+        
         max_alternatives=1,
     )
 
@@ -289,7 +358,7 @@ def main():
     )
 
     mic_manager = ResumableMicrophoneStream(SAMPLE_RATE, CHUNK_SIZE)
-    print(mic_manager.chunk_size)
+    #print(mic_manager.chunk_size)
     sys.stdout.write(YELLOW)
     sys.stdout.write('\nListening, say "Quit" or "Exit" to stop.\n\n')
     sys.stdout.write("End (ms)       Transcript Results/Status\n")
@@ -300,7 +369,8 @@ def main():
         while not stream.closed:
             sys.stdout.write(YELLOW)
             sys.stdout.write(
-                "\n" + str(STREAMING_LIMIT * stream.restart_counter) + ": NEW REQUEST\n"
+                #"\n" + str(STREAMING_LIMIT * stream.restart_counter) + ": NEW REQUEST\n""""
+                "\n" + "NEW REQUEST\n"
             )
 
             stream.audio_input = []
@@ -314,8 +384,10 @@ def main():
             responses = client.streaming_recognize(streaming_config, requests, timeout=72000000)
 
             # Now, put the transcription responses to use.
-            listen_print_loop(responses, stream)
+            #listen_print_loop(responses, stream)
+            listen_print_loop(responses, stream, language)
 
+            """
             if stream.result_end_time > 0:
                 stream.final_request_end_time = stream.is_final_end_time
             stream.result_end_time = 0
@@ -327,6 +399,7 @@ def main():
             if not stream.last_transcript_was_final:
                 sys.stdout.write("\n")
             stream.new_stream = True
+            """
 
 
 english_stop_words = [
@@ -366,7 +439,7 @@ french_stop_words = [
                 'c\'est', '1', '2', '3','4','5','6','7','8','9','0', 'c', 'c\''
             ]
 
-def frequency(file, langage_stop_words):
+def frequency(file, langage_stop_words = []):
     frequency = {}
     fhand = open(file, "r")
     """
@@ -409,14 +482,14 @@ def translate_text(text, project_id="speechtotextapi-340414"):
             "parent": parent,
             "contents": [text],
             "mime_type": "text/plain",  # mime types: text/plain, text/html
-            "source_language_code": "en-US",
-            "target_language_code": "fr-FR",
+            "source_language_code": "fr-FR",
+            "target_language_code": "en-US",
         }
     )
 
     # Display the translation for each input text provided
     # Write transcription in a file 
-    fhand = open("translateStreaming.txt", "w")
+    fhand = open("translateStreaming.txt", "a")
     for translation in response.translations:
         fhand.write("{}".format(translation.translated_text))
         print("Translated text: {}".format(translation.translated_text))
@@ -434,7 +507,7 @@ def makeImage(text):
 
 if __name__ == "__main__":
     main()
-    """
+    
     fhand = open("streaming.txt", "r")
     text = fhand.read()
     print("Start of the translation")
@@ -450,5 +523,5 @@ if __name__ == "__main__":
     plt.show()
 
     makeImage(freq)
-    """
+    
 
